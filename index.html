@@ -398,6 +398,12 @@
                 const saved = localStorage.getItem('viral_lab_draft');
                 if (saved) { try { const parsed = JSON.parse(saved); setFormData(parsed.formData || {}); setStep(parsed.step || 1); setAnalysis(parsed.analysis || null); setScript(parsed.script || []); } catch (e) { console.error("Load error", e); } }
             }, []);
+            
+            // --- NEW: Scroll to top on step change ---
+            useEffect(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, [step]);
+
             useEffect(() => { const timer = setInterval(() => handleSaveDraft(true), 30000); return () => clearInterval(timer); }, [formData, step, analysis, script]);
             const handleSaveDraft = (auto = false) => { const state = { formData, step, analysis, script }; localStorage.setItem('viral_lab_draft', JSON.stringify(state)); if (!auto) { setShowSaveNotification(true); setTimeout(() => setShowSaveNotification(false), 3000); } };
             
