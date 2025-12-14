@@ -30,47 +30,30 @@ exports.handler = async (event, context) => {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ];
 
-    // 4. ATTEMPT 1: Try the requested gemini-2.5-flash model
-    try {
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash", 
-            generationConfig: { responseMimeType: "application/json" },
-            safetySettings: safetySettings
-        });
+    // 4. ATTEMPT: Use Gemini 2.5 Flash
+    // FIX: Removed 'responseMimeType' to prevent 400 Bad Request errors
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.5-flash", 
+        // generationConfig: { responseMimeType: "application/json" }, <--- REMOVED TO PREVENT 400 ERROR
+        safetySettings: safetySettings
+    });
 
-        const result = await model.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
-        const response = await result.response;
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: response.text(),
-        };
+    const result = await model.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
+    const response = await result.response;
+    let text = response.text();
 
-    } catch (primaryError) {
-        console.warn("Primary model (gemini-2.5-flash) failed. Attempting fallback.", primaryError.message);
+    // 5. MANUAL CLEANUP: Strip Markdown code blocks if present
+    // Since we removed JSON mode, we must clean the output manually to ensure valid JSON.
+    text = text.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
 
-        // 5. ATTEMPT 2: Fallback to gemini-1.5-flash if 2.5 fails (usually due to 404/Not Found)
-        // This ensures the tool works for students even if the specific model string is rejected.
-        const fallbackModel = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", 
-            generationConfig: { responseMimeType: "application/json" },
-            safetySettings: safetySettings
-        });
-
-        const result = await fallbackModel.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
-        const response = await result.response;
-        
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: response.text(),
-        };
-    }
+    return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: text,
+    };
 
   } catch (error) {
-    // 6. CRITICAL FIX: improved error logging
-    // We now return the REAL error message to the frontend so you can see if it's "Model not found" or something else.
-    console.error("All generation attempts failed:", error);
+    console.error("Backend Error:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: `Generation Failed: ${error.message}` }),
