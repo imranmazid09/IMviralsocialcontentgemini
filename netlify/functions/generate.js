@@ -31,6 +31,7 @@ exports.handler = async (event, context) => {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ];
 
+    // UPDATED: Using gemini-2.5-flash per your instruction
     const model = genAI.getGenerativeModel({ 
         model: "gemini-2.5-flash", 
         generationConfig: { responseMimeType: "application/json" }, // Forces strict JSON
