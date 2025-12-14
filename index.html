@@ -83,7 +83,6 @@
 
         // --- BACKEND API HANDLING ---
         const callGeminiAPI = async (systemPrompt, userPrompt) => {
-            // Note: We no longer pass apiKey here. It is handled on the backend.
             try {
                 const response = await fetch('/.netlify/functions/generate', {
                     method: 'POST',
@@ -96,7 +95,7 @@
                     throw new Error(err.error || "Server communication failed");
                 }
 
-                return await response.json(); // Backend now returns clean JSON
+                return await response.json(); 
             } catch (error) {
                 console.error("API Error:", error);
                 throw error;
@@ -104,7 +103,7 @@
         };
 
         // --- ISOLATED COMPONENTS ---
-        const Nav = ({ step, handleSaveDraft, setShowWelcome }) => (
+        const Nav = ({ step, handleSaveDraft, setShowWelcome, handleNewSession }) => (
             <div className="bg-purple-50 border-b border-purple-100 p-4 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto flex justify-between items-center">
                     <div>
@@ -116,7 +115,10 @@
                         </div>
                     </div>
                     <div className="flex gap-2">
-                         <button onClick={() => setShowWelcome(true)} className="p-2 text-gray-500 hover:text-purple-600" title="How to Use">❓</button>
+                        <button onClick={handleNewSession} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded hover:bg-red-100 font-bold transition-colors">
+                            🔄 New Session
+                        </button>
+                        <button onClick={() => setShowWelcome(true)} className="p-2 text-gray-500 hover:text-purple-600" title="How to Use">❓</button>
                         <button onClick={() => handleSaveDraft(false)} className="flex items-center gap-1 text-xs bg-white border border-purple-200 px-3 py-2 rounded hover:bg-purple-50">💾 Save Draft</button>
                     </div>
                 </div>
@@ -210,13 +212,15 @@
             </div>
         );
 
-        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis, loading }) => {
+        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis, loading, formData }) => {
             if (!analysis) return <div>Error: No Analysis Data.</div>;
             const passed = analysis.score >= 8;
-            const Card = ({ title, comp }) => (
+            
+            // NOTE: We now pull original text from formData to ensure it's always visible
+            const Card = ({ title, comp, originalText }) => (
                 <div className="bg-white border rounded-lg shadow-sm mb-4">
                     <div className="bg-gray-50 px-4 py-2 border-b flex justify-between font-bold text-sm text-gray-600"><span>{title.toUpperCase()}</span><span className={comp.score < 4 ? 'text-red-500' : 'text-green-600'}>{comp.score}/5</span></div>
-                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm">{comp.original_snippet || "See above"}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm">{comp.improved_version}</p></div></div>
+                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm whitespace-pre-wrap">{originalText}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm whitespace-pre-wrap">{comp.improved_version}</p></div></div>
                     <div className="p-3 bg-gray-50 text-xs italic border-t">{comp.feedback}</div>
                     <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Accept Improved Version ✅</button></div>
                 </div>
@@ -224,10 +228,10 @@
             return (
                 <div className="p-8 animate-fade-in">
                     <div className={`text-center p-6 rounded-lg mb-8 ${passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}><h2 className="text-4xl font-bold mb-2">{analysis.score}/10</h2><p className="font-bold text-lg">{passed ? "VIRAL READY! 🚀" : "NEEDS REFINEMENT 🛠️"}</p><p className="mt-4 text-sm text-left whitespace-pre-wrap font-medium opacity-90">{analysis.overall_feedback}</p></div>
-                    <Card title="Hook" comp={analysis.components.hook} />
-                    <Card title="Value" comp={analysis.components.value} />
-                    <Card title="Payoff" comp={analysis.components.payoff} />
-                    <Card title="CTA" comp={analysis.components.cta} />
+                    <Card title="Hook" comp={analysis.components.hook} originalText={formData.hookText} />
+                    <Card title="Value" comp={analysis.components.value} originalText={formData.valueText} />
+                    <Card title="Payoff" comp={analysis.components.payoff} originalText={formData.payoffText} />
+                    <Card title="CTA" comp={analysis.components.cta} originalText={formData.ctaText} />
                     <div className="mt-8 flex flex-col md:flex-row justify-center gap-4 items-center">
                         <button onClick={runAnalysis} disabled={loading} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-purple-50 disabled:opacity-50">
                             {loading ? "Analyzing... ⏳" : "Re-Analyze (Current Text) 🔄"}
@@ -287,33 +291,37 @@
             }, []);
             useEffect(() => { const timer = setInterval(() => handleSaveDraft(true), 30000); return () => clearInterval(timer); }, [formData, step, analysis, script]);
             const handleSaveDraft = (auto = false) => { const state = { formData, step, analysis, script }; localStorage.setItem('viral_lab_draft', JSON.stringify(state)); if (!auto) { setShowSaveNotification(true); setTimeout(() => setShowSaveNotification(false), 3000); } };
+            
+            // --- NEW: HANDLE FRESH SESSION ---
+            const handleNewSession = () => {
+                if(confirm("Start a fresh session? This will clear your current draft.")) {
+                    localStorage.removeItem('viral_lab_draft');
+                    window.location.reload();
+                }
+            };
+            
             const updateForm = (field, value) => { setFormData(prev => ({ ...prev, [field]: value })); };
             const getFinalValue = (mainKey, otherKey) => { return formData[mainKey] === 'Other' || formData[mainKey] === 'Custom' ? formData[otherKey] : formData[mainKey]; };
 
             const runAnalysis = async () => {
                 setLoading(true);
                 try {
-                    // --- UPDATED STRICT SYSTEM PROMPT ---
-                    const systemPrompt = `You are a strict, world-class Viral Content Strategist & Critic. Your job is to grade short-form video scripts with ZERO TOLERANCE for laziness, hallucination, or mismatch.
+                    // --- STRICTER SCORING LOGIC ---
+                    const systemPrompt = `You are a strict, world-class Viral Content Strategist.
+SCORING RULES:
+1.  **LENGTH CHECK (CRITICAL):** If the input text is shorter than 50 characters TOTAL across all sections, or consists of repeated letters (e.g. "asdf", "fffff"), you MUST return a score of 0/10.
+2.  **SCORE 0/10 CONDITION:** If the content is gibberish, lazy, or clearly not an attempt at a script, score 0/10.
+3.  **FEEDBACK:** If scoring 0, feedback must be: "Input is too short or invalid. Please write actual content."
 
-CRITICAL RULES:
-1. GIBBERISH/LAZINESS DETECTOR: If the user input contains random letters (e.g., "asdf", "fffff"), placeholders, or is fewer than 10 words total, you MUST return a Total Score of 0/10 and Component Scores of 0/5. The "overall_feedback" MUST be exactly: "The input appears to be invalid or too short. Please write actual content to receive a grade."
-2. ANTI-HALLUCINATION: Grade ONLY the text provided. Do not imagine what the user "meant" to say. If it's not written, it doesn't exist.
-3. REALITY CHECK: Check if the text matches the selected Strategy. Example: If "Curiosity Gap" is selected but the text is "Hello everyone", give a score of 1/5 for the Hook and scold the user in feedback.
-4. SCORING: 
-   - < 8/10: Fail. Harsh, constructive feedback.
-   - 8+/10: Pass. 
-   - 10/10: Only for Super Bowl commercial level perfection.
-   
-OUTPUT FORMAT: Strictly JSON only. No markdown.
+OUTPUT JSON ONLY.
 { 
   "score": number (0-10), 
   "overall_feedback": "string", 
   "components": { 
-    "hook": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
-    "value": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
-    "payoff": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
-    "cta": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" } 
+    "hook": { "score": 1-5, "feedback": "", "improved_version": "" }, 
+    "value": { "score": 1-5, "feedback": "", "improved_version": "" }, 
+    "payoff": { "score": 1-5, "feedback": "", "improved_version": "" }, 
+    "cta": { "score": 1-5, "feedback": "", "improved_version": "" } 
   } 
 }`;
 
@@ -344,7 +352,7 @@ USER NOTES: ${formData.customInstructions}`;
             const generateScript = async () => {
                 setLoading(true);
                 try {
-                    const systemPrompt = `You are a Video Production AI. Generate a detailed shooting script based on the approved content. Return strictly JSON: { "title": "string", "scenes": [ { "id": 1, "time_range": "0:00-0:03", "spoken": "string", "visual": "string", "notes": "string" } ] }`;
+                    const systemPrompt = `You are a Video Production AI. Generate a detailed shooting script. Return strictly JSON: { "title": "string", "scenes": [ { "id": 1, "time_range": "0:00-0:03", "spoken": "string", "visual": "string", "notes": "string" } ] }`;
                     const userPrompt = `Context: Score ${analysis?.score}/10 viral content. Platform: ${getFinalValue('platform', 'platformOther')} Style: ${getFinalValue('scriptStyle', 'scriptStyleOther')} Duration: ${getFinalValue('scriptDuration', 'scriptDurationOther')} Scene Count: ${formData.sceneCount} Hook: ${formData.hookText} Value: ${formData.valueText} Payoff: ${formData.payoffText} CTA: ${formData.ctaText}`;
                     
                     const result = await callGeminiAPI(systemPrompt, userPrompt);
@@ -372,7 +380,7 @@ USER NOTES: ${formData.customInstructions}`;
                 <div className="min-h-screen">
                     {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
                     {showSaveNotification && <div className="fixed top-20 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow-lg z-50">✅ Draft Saved</div>}
-                    <Nav step={step} handleSaveDraft={handleSaveDraft} setShowWelcome={setShowWelcome} />
+                    <Nav step={step} handleSaveDraft={handleSaveDraft} setShowWelcome={setShowWelcome} handleNewSession={handleNewSession} />
                     <main className="max-w-4xl mx-auto p-4 md:p-8">
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[60vh]">
                             {step === 1 && <StepNiche formData={formData} updateForm={updateForm} setStep={setStep} />}
@@ -382,7 +390,7 @@ USER NOTES: ${formData.customInstructions}`;
                             {step === 5 && <SelectionGridStep title="Step 5: Value (3-25s)" description="The core content..." options={VALUE_OPTIONS} selected={formData.valuePattern} onSelect={(val) => updateForm('valuePattern', val)} otherValue={formData.valuePatternOther} onOtherChange={(val) => updateForm('valuePatternOther', val)} textValue={formData.valueText} onTextChange={(val) => updateForm('valueText', val)} placeholder="Deliver the value..." tip="Deliver ONE focused idea." prevStep={4} nextStep={6} minChars={20} setStep={setStep} />}
                             {step === 6 && <SelectionGridStep title="Step 6: Payoff" description="The satisfying resolution..." options={PAYOFF_OPTIONS} selected={formData.payoffFormula} onSelect={(val) => updateForm('payoffFormula', val)} otherValue={formData.payoffFormulaOther} onOtherChange={(val) => updateForm('payoffFormulaOther', val)} textValue={formData.payoffText} onTextChange={(val) => updateForm('payoffText', val)} placeholder="Wrap it up..." tip="Make it quotable." prevStep={5} nextStep={7} minChars={10} setStep={setStep} />}
                             {step === 7 && <StepCTA formData={formData} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
-                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
+                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} formData={formData} />}
                             {step === 9 && <StepConfigGen formData={formData} updateForm={updateForm} setStep={setStep} generateScript={generateScript} loading={loading} />}
                             {step === 10 && <StepScript script={script} scriptMeta={scriptMeta} regenerateScene={regenerateScene} setStep={setStep} />}
                             {step === 11 && (<div className="p-12 text-center"><h2 className="text-2xl font-bold mb-4">Start Over?</h2><button onClick={() => { localStorage.removeItem('viral_lab_draft'); window.location.reload(); }} className="px-6 py-2 bg-red-600 text-white rounded">Yes, Delete & Restart</button><button onClick={() => setStep(10)} className="ml-4 px-6 py-2 bg-gray-100 rounded">Cancel</button></div>)}
