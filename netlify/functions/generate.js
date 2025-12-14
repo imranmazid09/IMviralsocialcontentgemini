@@ -19,11 +19,10 @@ exports.handler = async (event, context) => {
   try {
     const { systemPrompt, userPrompt } = JSON.parse(event.body);
 
-    // 3. Initialize Gemini with JSON Enforcement & Safety Settings
+    // 3. Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Configure safety settings to be permissive so it doesn't block "gibberish" or "harsh" critiques
-    // This fixes the "Analysis Failed" error when the AI thinks the input is spam.
+    // Safety Settings: Permissive to allow "gibberish" checks without 500 errors
     const safetySettings = [
       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -31,30 +30,50 @@ exports.handler = async (event, context) => {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ];
 
-    // UPDATED: Using gemini-2.5-flash per your instruction
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash", 
-        generationConfig: { responseMimeType: "application/json" }, // Forces strict JSON
-        safetySettings: safetySettings // Prevents 500 errors on bad input
-    });
+    // 4. ATTEMPT 1: Try the requested gemini-2.5-flash model
+    try {
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash", 
+            generationConfig: { responseMimeType: "application/json" },
+            safetySettings: safetySettings
+        });
 
-    // 4. Generate Content
-    const result = await model.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
-    const response = await result.response;
-    const text = response.text();
+        const result = await model.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
+        const response = await result.response;
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: response.text(),
+        };
 
-    // 5. Return success
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: text,
-    };
+    } catch (primaryError) {
+        console.warn("Primary model (gemini-2.5-flash) failed. Attempting fallback.", primaryError.message);
+
+        // 5. ATTEMPT 2: Fallback to gemini-1.5-flash if 2.5 fails (usually due to 404/Not Found)
+        // This ensures the tool works for students even if the specific model string is rejected.
+        const fallbackModel = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash", 
+            generationConfig: { responseMimeType: "application/json" },
+            safetySettings: safetySettings
+        });
+
+        const result = await fallbackModel.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
+        const response = await result.response;
+        
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: response.text(),
+        };
+    }
 
   } catch (error) {
-    console.error("Backend API Error:", error);
+    // 6. CRITICAL FIX: improved error logging
+    // We now return the REAL error message to the frontend so you can see if it's "Model not found" or something else.
+    console.error("All generation attempts failed:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Failed to generate content. Please try again." }),
+      body: JSON.stringify({ error: `Generation Failed: ${error.message}` }),
     };
   }
 };
