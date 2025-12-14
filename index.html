@@ -311,7 +311,7 @@
 SCORING RULES:
 1.  **LENGTH CHECK (CRITICAL):** If the input text is shorter than 50 characters TOTAL across all sections, or consists of repeated letters (e.g. "asdf", "fffff"), you MUST return a score of 0/10.
 2.  **SCORE 0/10 CONDITION:** If the content is gibberish, lazy, or clearly not an attempt at a script, score 0/10.
-3.  **FEEDBACK:** If scoring 0, feedback must be: "Input is too short or invalid. Please write actual content."
+3.  **FEEDBACK:** If scoring 0, feedback must be exactly: "The input appears to be invalid or too short. Please write actual content to receive a grade."
 
 OUTPUT JSON ONLY.
 { 
