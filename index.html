@@ -220,7 +220,7 @@
             const Card = ({ title, comp, originalText }) => (
                 <div className="bg-white border rounded-lg shadow-sm mb-4">
                     <div className="bg-gray-50 px-4 py-2 border-b flex justify-between font-bold text-sm text-gray-600"><span>{title.toUpperCase()}</span><span className={comp.score < 4 ? 'text-red-500' : 'text-green-600'}>{comp.score}/5</span></div>
-                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm whitespace-pre-wrap">{originalText}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm whitespace-pre-wrap">{comp.improved_version}</p></div></div>
+                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm whitespace-pre-wrap">{originalText}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm whitespace-pre-wrap">{comp.improved_version || "No improvement generated."}</p></div></div>
                     <div className="p-3 bg-gray-50 text-xs italic border-t">{comp.feedback}</div>
                     <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Accept Improved Version ✅</button></div>
                 </div>
@@ -233,8 +233,8 @@
                     <Card title="Payoff" comp={analysis.components.payoff} originalText={formData.payoffText} />
                     <Card title="CTA" comp={analysis.components.cta} originalText={formData.ctaText} />
                     <div className="mt-8 flex flex-col md:flex-row justify-center gap-4 items-center">
-                        <button onClick={runAnalysis} disabled={loading} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-purple-50 disabled:opacity-50">
-                            {loading ? "Analyzing... ⏳" : "Re-Analyze (Current Text) 🔄"}
+                        <button onClick={runAnalysis} disabled={loading} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-purple-50 disabled:opacity-50 shadow-sm transition-all hover:shadow-md">
+                            {loading ? "Analyzing... ⏳" : "✨ Generate New Improvements"}
                         </button>
                         
                         {!passed && (
@@ -312,6 +312,8 @@ SCORING RULES:
 1.  **LENGTH CHECK (CRITICAL):** If the input text is shorter than 50 characters TOTAL across all sections, or consists of repeated letters (e.g. "asdf", "fffff"), you MUST return a score of 0/10.
 2.  **SCORE 0/10 CONDITION:** If the content is gibberish, lazy, or clearly not an attempt at a script, score 0/10.
 3.  **FEEDBACK:** If scoring 0, feedback must be exactly: "The input appears to be invalid or too short. Please write actual content to receive a grade."
+4.  **IMPROVED VERSION (MANDATORY):** - If score > 0: You MUST provide a rewritten, viral-optimized version in the 'improved_version' field. Do NOT leave it empty.
+    - If score = 0: Set 'improved_version' to "N/A - Write actual content to receive improvements."
 
 OUTPUT JSON ONLY.
 { 
