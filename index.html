@@ -227,7 +227,7 @@
             </div>
         );
 
-        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis, loading, formData }) => {
+        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis, loading, formData, handleAcceptImprovement }) => {
             if (!analysis) return <div>Error: No Analysis Data.</div>;
             const passed = analysis.score >= 8;
             
@@ -237,7 +237,7 @@
                     <div className="bg-gray-50 px-4 py-2 border-b flex justify-between font-bold text-sm text-gray-600"><span>{title.toUpperCase()}</span><span className={comp.score < 4 ? 'text-red-500' : 'text-green-600'}>{comp.score}/5</span></div>
                     <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm whitespace-pre-wrap">{originalText}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm whitespace-pre-wrap">{comp.improved_version || "No improvement generated."}</p></div></div>
                     <div className="p-3 bg-gray-50 text-xs italic border-t">{comp.feedback}</div>
-                    <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Accept Improved Version ✅</button></div>
+                    <div className="p-2 border-t text-right"><button onClick={() => handleAcceptImprovement(title.toLowerCase(), comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Accept Improved Version ✅</button></div>
                 </div>
             );
             return (
@@ -401,7 +401,7 @@
             
             // --- NEW: Scroll to top on step change ---
             useEffect(() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                window.scrollTo(0, 0); // Instant scroll to top
             }, [step]);
 
             useEffect(() => { const timer = setInterval(() => handleSaveDraft(true), 30000); return () => clearInterval(timer); }, [formData, step, analysis, script]);
@@ -417,6 +417,35 @@
             
             const updateForm = (field, value) => { setFormData(prev => ({ ...prev, [field]: value })); };
             const getFinalValue = (mainKey, otherKey) => { return formData[mainKey] === 'Other' || formData[mainKey] === 'Custom' ? formData[otherKey] : formData[mainKey]; };
+
+            const handleAcceptImprovement = (section, improvedText) => {
+                // 1. Update form text
+                updateForm(section + 'Text', improvedText);
+
+                // 2. Update analysis score locally
+                setAnalysis(prev => {
+                    if (!prev) return null;
+                    const newAnalysis = JSON.parse(JSON.stringify(prev)); // Deep copy
+                    
+                    // Set component score to 5 (Perfect)
+                    if (newAnalysis.components[section]) {
+                        newAnalysis.components[section].score = 5;
+                        newAnalysis.components[section].feedback = "✅ Improvement Accepted (Score updated)";
+                    }
+
+                    // Recalculate Total Score (Sum / 2)
+                    const { hook, value, payoff, cta } = newAnalysis.components;
+                    const total = hook.score + value.score + payoff.score + cta.score;
+                    newAnalysis.score = Math.min(10, Math.ceil(total / 2)); // e.g. 20/2 = 10
+
+                    // Update overall feedback if passing
+                    if (newAnalysis.score >= 8) {
+                        newAnalysis.overall_feedback = newAnalysis.overall_feedback + "\n\n(✅ Score updated based on accepted improvements. You are ready to proceed!)";
+                    }
+
+                    return newAnalysis;
+                });
+            };
 
             const runAnalysis = async () => {
                 setLoading(true);
@@ -507,7 +536,7 @@ USER NOTES: ${formData.customInstructions}`;
                             {step === 5 && <SelectionGridStep title="Step 5: Value (3-25s)" description="The core content..." options={VALUE_OPTIONS} selected={formData.valuePattern} onSelect={(val) => updateForm('valuePattern', val)} otherValue={formData.valuePatternOther} onOtherChange={(val) => updateForm('valuePatternOther', val)} textValue={formData.valueText} onTextChange={(val) => updateForm('valueText', val)} placeholder="Deliver the value..." tip="Deliver ONE focused idea." prevStep={4} nextStep={6} minChars={20} setStep={setStep} />}
                             {step === 6 && <SelectionGridStep title="Step 6: Payoff" description="The satisfying resolution..." options={PAYOFF_OPTIONS} selected={formData.payoffFormula} onSelect={(val) => updateForm('payoffFormula', val)} otherValue={formData.payoffFormulaOther} onOtherChange={(val) => updateForm('payoffFormulaOther', val)} textValue={formData.payoffText} onTextChange={(val) => updateForm('payoffText', val)} placeholder="Wrap it up..." tip="Make it quotable." prevStep={5} nextStep={7} minChars={10} setStep={setStep} />}
                             {step === 7 && <StepCTA formData={formData} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
-                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} formData={formData} />}
+                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} formData={formData} handleAcceptImprovement={handleAcceptImprovement} />}
                             {step === 9 && <StepConfigGen formData={formData} updateForm={updateForm} setStep={setStep} generateScript={generateScript} loading={loading} />}
                             {step === 10 && <StepScript script={script} scriptMeta={scriptMeta} regenerateScene={regenerateScene} setStep={setStep} />}
                             {step === 11 && (<div className="p-12 text-center no-print"><h2 className="text-2xl font-bold mb-4">Start Over?</h2><button onClick={() => { localStorage.removeItem('viral_lab_draft'); window.location.reload(); }} className="px-6 py-2 bg-red-600 text-white rounded">Yes, Delete & Restart</button><button onClick={() => setStep(10)} className="ml-4 px-6 py-2 bg-gray-100 rounded">Cancel</button></div>)}
