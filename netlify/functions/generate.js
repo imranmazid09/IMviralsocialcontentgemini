@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 
 exports.handler = async (event, context) => {
   // 1. Security: Only allow POST requests
@@ -19,23 +19,30 @@ exports.handler = async (event, context) => {
   try {
     const { systemPrompt, userPrompt } = JSON.parse(event.body);
 
-    // 3. Initialize Gemini with JSON Enforcement
+    // 3. Initialize Gemini with JSON Enforcement & Safety Settings
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Note: Used 'gemini-1.5-flash' as '2.5' is not yet a standard public endpoint.
-    // If you specifically have access to a preview model, you can change this back.
+    // Configure safety settings to be permissive so it doesn't block "gibberish" or "harsh" critiques
+    // This fixes the "Analysis Failed" error when the AI thinks the input is spam.
+    const safetySettings = [
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    ];
+
     const model = genAI.getGenerativeModel({ 
         model: "gemini-2.5-flash", 
-        generationConfig: { responseMimeType: "application/json" } // <--- CRITICAL: Forces strict JSON
+        generationConfig: { responseMimeType: "application/json" }, // Forces strict JSON
+        safetySettings: safetySettings // Prevents 500 errors on bad input
     });
 
     // 4. Generate Content
-    // We combine prompts to ensure the system instruction is strictly followed
     const result = await model.generateContent(systemPrompt + "\n\nUSER INPUT:\n" + userPrompt);
     const response = await result.response;
     const text = response.text();
 
-    // 5. Return success with correct headers
+    // 5. Return success
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
