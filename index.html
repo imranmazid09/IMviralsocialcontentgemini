@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Imran's Viral Content Lab</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d8b4fe; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #c084fc; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div id="root">
+        <div class="min-h-screen flex items-center justify-center text-gray-500 font-mono animate-pulse">
+            Initializing Viral Lab...
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- CONSTANTS ---
+        const NICHE_OPTIONS = [ "Personal Branding", "Marketing Tips", "Tech Reviews", "Fitness & Wellness", "Finance Education", "Career Advice", "Food & Cooking", "Travel & Lifestyle", "Education & Tutorials", "Other" ];
+        const VALS_TYPES = [
+            { name: "Innovators", desc: "Successful, sophisticated, high resources, change leaders" },
+            { name: "Thinkers", desc: "Mature, satisfied, reflective, value order and knowledge" },
+            { name: "Achievers", desc: "Goal-oriented, brand-conscious, favor premium products" },
+            { name: "Experiencers", desc: "Young, enthusiastic, impulsive, seek variety and excitement" },
+            { name: "Believers", desc: "Strong principles, favor familiar products, established brands" },
+            { name: "Strivers", desc: "Trendy, fun-loving, resource-constrained, seek approval" },
+            { name: "Makers", desc: "Practical, self-sufficient, value functionality over luxury" },
+            { name: "Survivors", desc: "Cautious, loyal to brands, limited resources, focus on safety" }
+        ];
+        const HOOK_OPTIONS = [
+            { name: "Curiosity Gap", desc: "Opens an information gap the viewer must close.", example: '"The mistake that cost me $10k..."' },
+            { name: "Negative / Warning", desc: "Triggers loss aversion—fear of missing out.", example: '"Stop doing this if you want more followers..."' },
+            { name: "Transformation", desc: "Shows before-and-after that triggers aspiration.", example: '"How I went from 200 to 50k followers..."' },
+            { name: "Insider Secret", desc: "Exclusive information most people don't get.", example: '"What brands don\'t tell you about deals..."' },
+            { name: "Listicle", desc: "Clear value upfront with predictability.", example: '"3 tools you need to survive 2025..."' },
+            { name: "Unexpected Confession", desc: "Intimacy through vulnerability.", example: '"I probably shouldn\'t share this, but..."' },
+            { name: "Contrarian Challenge", desc: "Questions conventional wisdom.", example: '"Stop posting daily. Do this instead."' },
+            { name: "Quick Fix", desc: "Fast, actionable value respecting viewer's time.", example: '"Fix your lighting in 60 seconds."' },
+            { name: "Suspense Builder", desc: "Opens a narrative loop viewers must close.", example: '"Watch what happens when I DM 100 brands..."' },
+            { name: "Costly Mistake", desc: "Personal vulnerability + financial/emotional stakes.", example: '"This mistake cost me $5,000."' }
+        ];
+        const VALUE_OPTIONS = [
+            { name: "Do X, not Y", desc: "Correct a common mistake with a better alternative.", example: '"Instead of cardio (Y), do heavy lifting (X)."' },
+            { name: "Here's the 2-step fix", desc: "Simplify a complex problem into actionable steps.", example: '"Step 1: Unplug it. Step 2: Hold power for 10s."' },
+            { name: "3 mistakes + quick fixes", desc: "High density value in list format.", example: '"Mistake 1: Bad audio. Fix: Get close to mic."' },
+            { name: "Watch me demo it", desc: "Visual proof and tutorial style.", example: '"Watch exactly how I edit this transition..."' }
+        ];
+        const PAYOFF_OPTIONS = [
+            { name: "So the move is...", desc: "A definitive, confident conclusion.", example: '"So the move is: stop pitching, start commenting."' },
+            { name: "The principle is...", desc: " Elevate the tactic to a strategy.", example: '"The principle is: consistency beats intensity."' },
+            { name: "If you remember one thing...", desc: "Focus attention on the key takeaway.", example: '"If you remember one thing: lighting is key."' },
+            { name: "Here's what this means...", desc: "Translate facts into personal benefit.", example: '"Here\'s what this means for your wallet..."' }
+        ];
+        const CTA_TYPES = [ "Save", "Comment", "Follow", "Share", "Click Link", "DM Me", "Other" ];
+        const PLATFORM_TIPS = {
+            "TikTok": "Fast-paced, trend-driven, Gen Z heavy. Aim for 15-20s.",
+            "Instagram Reels": "Visual-first, lifestyle, Millennials. Aesthetic matters.",
+            "YouTube Shorts": "Search-friendly, tutorial-focused. Can be longer (60s).",
+            "Facebook Reels": "Older demographics, inspirational content works well.",
+            "LinkedIn": "Professional tone, career-focused, mute-friendly text.",
+            "Other": "Specify your platform constraints."
+        };
+        const STYLES = [ "Talking Head", "Voiceover", "Vlog", "Skit", "Cinematic", "Green Screen", "Other" ];
+        const DURATIONS = [ "15 seconds", "30 seconds", "60 seconds", "90 seconds", "Other" ];
+
+        // --- BACKEND API HANDLING ---
+        const callGeminiAPI = async (systemPrompt, userPrompt) => {
+            // Note: We no longer pass apiKey here. It is handled on the backend.
+            try {
+                const response = await fetch('/.netlify/functions/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ systemPrompt, userPrompt })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || "Server communication failed");
+                }
+
+                return await response.json(); // Backend now returns clean JSON
+            } catch (error) {
+                console.error("API Error:", error);
+                throw error;
+            }
+        };
+
+        // --- ISOLATED COMPONENTS ---
+        const Nav = ({ step, handleSaveDraft, setShowWelcome }) => (
+            <div className="bg-purple-50 border-b border-purple-100 p-4 sticky top-0 z-10">
+                <div className="max-w-5xl mx-auto flex justify-between items-center">
+                    <div>
+                        <h2 className="font-bold text-purple-900">Dr. Imran's Lab 🧪</h2>
+                        <div className="flex gap-2 text-xs font-mono mt-1 text-purple-600">
+                            <span>STEP {step} OF 11</span>
+                            <span className="text-gray-300">|</span>
+                            <span>{step < 4 ? "SETUP" : step < 8 ? "STRUCTURE" : step === 8 ? "ANALYSIS" : "PRODUCTION"}</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                         <button onClick={() => setShowWelcome(true)} className="p-2 text-gray-500 hover:text-purple-600" title="How to Use">❓</button>
+                        <button onClick={() => handleSaveDraft(false)} className="flex items-center gap-1 text-xs bg-white border border-purple-200 px-3 py-2 rounded hover:bg-purple-50">💾 Save Draft</button>
+                    </div>
+                </div>
+                <div className="h-1 bg-purple-100 mt-3 rounded-full overflow-hidden max-w-5xl mx-auto">
+                    <div className="h-full bg-purple-600 transition-all duration-500" style={{ width: `${(step / 11) * 100}%` }}></div>
+                </div>
+            </div>
+        );
+
+        const WelcomeModal = ({ onClose }) => (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm">
+                <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transform transition-all">
+                    <div className="bg-purple-600 p-6 text-white text-center">
+                        <h2 className="text-2xl font-bold">HOW THIS LAB WORKS</h2>
+                        <p className="opacity-90 mt-2 text-purple-100">Create viral short-form content in 4 stages</p>
+                    </div>
+                    <div className="p-6 space-y-6">
+                        <div className="flex gap-4"><span className="text-2xl bg-purple-50 w-10 h-10 flex items-center justify-center rounded-full shrink-0">1️⃣</span><div><h3 className="font-bold text-gray-900">SETUP (Steps 1-3)</h3><p className="text-sm text-gray-600">Define your niche, audience, and platform</p></div></div>
+                        <div className="flex gap-4"><span className="text-2xl bg-purple-50 w-10 h-10 flex items-center justify-center rounded-full shrink-0">2️⃣</span><div><h3 className="font-bold text-gray-900">STRUCTURE (Steps 4-7)</h3><p className="text-sm text-gray-600">Write your Hook → Value → Payoff → CTA</p></div></div>
+                        <div className="flex gap-4"><span className="text-2xl bg-purple-50 w-10 h-10 flex items-center justify-center rounded-full shrink-0">3️⃣</span><div><h3 className="font-bold text-gray-900">AI ANALYSIS (Step 8)</h3><p className="text-sm text-gray-600">Get scored out of 10. Need 8+ to generate script.</p></div></div>
+                        <div className="flex gap-4"><span className="text-2xl bg-purple-50 w-10 h-10 flex items-center justify-center rounded-full shrink-0">4️⃣</span><div><h3 className="font-bold text-gray-900">PRODUCTION (Steps 9-10)</h3><p className="text-sm text-gray-600">Generate script with scenes & notes</p></div></div>
+                    </div>
+                    <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+                        <button onClick={onClose} className="px-6 py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 shadow-md transform hover:scale-[1.02] transition-all">Start Lab</button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const StepNiche = ({ formData, updateForm, setStep }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-2xl font-bold text-purple-800 mb-6">Step 1: Select Your Niche</h2>
+                <label className="block font-medium mb-2 text-gray-700">What content niche are you creating for? *</label>
+                <select value={formData.niche} onChange={(e) => updateForm('niche', e.target.value)} className="w-full p-3 border rounded-lg bg-gray-50 mb-4">
+                    <option value="">Select your niche ▼</option>
+                    {NICHE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                {formData.niche === 'Other' && (<div className="animate-fade-in bg-purple-50 p-4 rounded-lg border border-purple-100"><label className="block text-sm font-bold text-purple-800 mb-1">Describe your niche:</label><input type="text" placeholder='Example: "Sustainable fashion for college students"' value={formData.nicheOther} onChange={(e) => updateForm('nicheOther', e.target.value)} className="w-full p-3 border border-purple-300 bg-white rounded-lg"/></div>)}
+                <div className="text-right mt-6"><button onClick={() => setStep(2)} disabled={!formData.niche} className="bg-purple-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 font-bold shadow-md hover:bg-purple-700 transition-colors">Next: Audience 👉</button></div>
+            </div>
+        );
+
+        const StepAudience = ({ formData, updateForm, setStep }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-2xl font-bold text-purple-800 mb-6">Step 2: Define Audience</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                    {VALS_TYPES.map(type => (<button key={type.name} onClick={() => updateForm('audience', type.name)} className={`text-left p-3 rounded border ${formData.audience === type.name ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-gray-200 hover:border-purple-300'}`}><div className="font-bold text-sm text-gray-800">{type.name}</div><div className="text-xs text-gray-500 leading-tight mt-1">{type.desc}</div></button>))}
+                    <button onClick={() => updateForm('audience', 'Other')} className={`text-left p-3 rounded border ${formData.audience === 'Other' ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-gray-200 hover:border-purple-300'}`}><div className="font-bold text-sm text-gray-800">Custom / Other</div><div className="text-xs text-gray-500 leading-tight mt-1">Define your own audience segment</div></button>
+                </div>
+                {formData.audience === 'Other' && (<div className="mb-6 animate-fade-in"><label className="block text-sm font-medium mb-1 text-gray-600">Describe your audience:</label><textarea value={formData.audienceOther} onChange={(e) => updateForm('audienceOther', e.target.value)} placeholder="e.g. Busy moms who love gardening..." className="w-full p-3 border border-purple-300 bg-purple-50 rounded-lg h-24"></textarea></div>)}
+                <div className="flex justify-between"><button onClick={() => setStep(1)} className="px-6 py-2 text-gray-500">Back</button><button onClick={() => setStep(3)} disabled={!formData.audience || (formData.audience === 'Other' && !formData.audienceOther)} className="bg-purple-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">Next: Platform 👉</button></div>
+            </div>
+        );
+
+        const StepPlatform = ({ formData, updateForm, setStep }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-2xl font-bold text-purple-800 mb-6">Step 3: Select Platform</h2>
+                <div className="space-y-3 mb-6">{Object.keys(PLATFORM_TIPS).map(p => (<button key={p} onClick={() => updateForm('platform', p)} className={`w-full flex justify-between items-center p-4 rounded border ${formData.platform === p ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}><span className="font-bold">{p}</span>{formData.platform === p && <span>✅</span>}</button>))}</div>
+                {formData.platform === 'Other' && (<div className="mb-6 animate-fade-in"><label className="block text-sm font-medium mb-1 text-gray-600">Specify Platform & Constraints:</label><input type="text" value={formData.platformOther} onChange={(e) => updateForm('platformOther', e.target.value)} placeholder="e.g. Twitter/X Video, 140s max..." className="w-full p-3 border border-purple-300 bg-purple-50 rounded-lg"/></div>)}
+                {formData.platform && <div className="bg-yellow-50 p-4 rounded border border-yellow-100 text-sm text-yellow-800 mb-6">💡 {PLATFORM_TIPS[formData.platform]}</div>}
+                <div className="flex justify-between"><button onClick={() => setStep(2)} className="px-6 py-2 text-gray-500">Back</button><button onClick={() => setStep(4)} disabled={!formData.platform} className="bg-purple-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">Next: Hook 👉</button></div>
+            </div>
+        );
+
+        const SelectionGridStep = ({ title, description, options, selected, onSelect, otherValue, onOtherChange, textValue, onTextChange, placeholder, tip, prevStep, nextStep, minChars, setStep }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-2xl font-bold text-purple-800 mb-2">{title}</h2>
+                {description && (<p className="text-sm text-gray-700 bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6 leading-relaxed">{description}</p>)}
+                <label className="block font-medium mb-3">Select type: *</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {options.map(opt => (<button key={opt.name} onClick={() => onSelect(opt.name)} className={`text-left p-3 rounded border h-full flex flex-col justify-start ${selected === opt.name ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-gray-200 hover:border-purple-300'}`}><div className="font-bold text-sm text-gray-800">{opt.name}</div><div className="text-xs text-gray-500 leading-tight mt-1 mb-2">{opt.desc}</div>{opt.example && <div className="text-xs text-purple-600 bg-purple-50/50 p-1 rounded mt-auto">Example: {opt.example}</div>}</button>))}
+                    <button onClick={() => onSelect('Other')} className={`text-left p-3 rounded border h-full flex flex-col justify-start ${selected === 'Other' || selected === 'Custom' ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-gray-200 hover:border-purple-300'}`}><div className="font-bold text-sm text-gray-800">Custom / Other</div><div className="text-xs text-gray-500 leading-tight mt-1">Define your own pattern</div></button>
+                </div>
+                {(selected === 'Other' || selected === 'Custom') && (<div className="mb-4 animate-fade-in"><label className="block text-sm font-bold text-gray-700 mb-1">Describe your custom type:</label><input type="text" value={otherValue} onChange={(e) => onOtherChange(e.target.value)} placeholder="e.g. The 'Wait for it' moment..." className="w-full p-2 border border-purple-300 rounded"/></div>)}
+                <div><label className="block font-medium mb-2">Write Content *</label><textarea value={textValue} onChange={(e) => onTextChange(e.target.value)} placeholder={placeholder} className="w-full p-4 border rounded-lg h-32 resize-none"></textarea><div className="text-right text-xs text-gray-400 mt-1">{textValue.length} chars</div></div>
+                <div className="bg-yellow-50 p-4 rounded border border-yellow-100 text-sm text-yellow-800 mt-4">💡 PRO TIP: {tip}</div>
+                <div className="flex justify-between mt-6"><button onClick={() => setStep(prevStep)} className="px-6 py-2 text-gray-500">Back</button><button onClick={() => setStep(nextStep)} disabled={!selected || textValue.length < (minChars || 5)} className="bg-purple-600 text-white px-6 py-2 rounded-lg disabled:opacity-50">Next 👉</button></div>
+            </div>
+        );
+
+        const StepCTA = ({ formData, updateForm, setStep, runAnalysis, loading }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-2xl font-bold text-purple-800 mb-2">Step 7: Call to Action</h2>
+                <p className="text-sm text-gray-700 bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6 leading-relaxed">The specific next step you want viewers to take. This directs audience behavior toward your goal...</p>
+                <div className="space-y-6">
+                    <div><label className="block font-medium mb-2">Select CTA Type</label><select value={formData.ctaType} onChange={(e) => updateForm('ctaType', e.target.value)} className="w-full p-3 border rounded-lg bg-gray-50"><option value="">Select CTA Type...</option>{CTA_TYPES.map(o => <option key={o} value={o}>{o}</option>)}</select>{formData.ctaType === 'Other' && (<input type="text" value={formData.ctaTypeOther} onChange={(e) => updateForm('ctaTypeOther', e.target.value)} placeholder="Describe custom CTA..." className="w-full p-3 border border-purple-300 bg-purple-50 rounded-lg mt-2"/>)}</div>
+                    <textarea value={formData.ctaText} onChange={(e) => updateForm('ctaText', e.target.value)} placeholder="e.g., Save this for later!" className="w-full p-4 border rounded-lg h-24"></textarea>
+                    <div className="bg-gray-100 p-4 rounded-lg"><label className="block text-sm font-bold text-gray-500 mb-1">Custom AI Instructions</label><input value={formData.customInstructions} onChange={(e) => updateForm('customInstructions', e.target.value)} placeholder="e.g. Be harsh, focus on clarity..." className="w-full bg-transparent border-none outline-none"/></div>
+                    <div className="flex justify-between"><button onClick={() => setStep(6)} className="px-6 py-2 text-gray-500">Back</button><button onClick={runAnalysis} disabled={!formData.ctaText || loading} className="bg-purple-600 text-white px-8 py-3 rounded-lg disabled:opacity-50 shadow-lg">{loading ? "Analyzing... ⏳" : "Get Full AI Analysis 🚀"}</button></div>
+                </div>
+            </div>
+        );
+
+        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis }) => {
+            if (!analysis) return <div>Error: No Analysis Data.</div>;
+            const passed = analysis.score >= 8;
+            const Card = ({ title, comp }) => (
+                <div className="bg-white border rounded-lg shadow-sm mb-4">
+                    <div className="bg-gray-50 px-4 py-2 border-b flex justify-between font-bold text-sm text-gray-600"><span>{title.toUpperCase()}</span><span className={comp.score < 4 ? 'text-red-500' : 'text-green-600'}>{comp.score}/5</span></div>
+                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm">Original text hidden for space...</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm">{comp.improved_version}</p></div></div>
+                    <div className="p-3 bg-gray-50 text-xs italic border-t">{comp.feedback}</div>
+                    <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded">Accept ✅</button></div>
+                </div>
+            );
+            return (
+                <div className="p-8 animate-fade-in">
+                    <div className={`text-center p-6 rounded-lg mb-8 ${passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}><h2 className="text-4xl font-bold mb-2">{analysis.score}/10</h2><p className="font-bold text-lg">{passed ? "VIRAL READY! 🚀" : "NEEDS REFINEMENT 🛠️"}</p><p className="mt-4 text-sm text-left whitespace-pre-wrap font-medium opacity-90">{analysis.overall_feedback}</p></div>
+                    <Card title="Hook" comp={analysis.components.hook} />
+                    <Card title="Value" comp={analysis.components.value} />
+                    <Card title="Payoff" comp={analysis.components.payoff} />
+                    <Card title="CTA" comp={analysis.components.cta} />
+                    <div className="mt-8 flex justify-center gap-4">{!passed && <button onClick={runAnalysis} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold">Re-Analyze 🔄</button>}<button onClick={() => setStep(9)} disabled={!passed} className="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">{passed ? "Generate Script 🎬" : "Refine to Proceed"}</button></div>
+                </div>
+            );
+        };
+
+        const StepConfigGen = ({ formData, updateForm, setStep, generateScript, loading }) => (
+            <div className="p-8 animate-fade-in text-center">
+                <h2 className="text-2xl font-bold text-purple-800 mb-6">Step 9: Production Settings</h2>
+                <div className="max-w-md mx-auto space-y-4 text-left">
+                    <div><label className="block font-medium mb-1">Duration</label><select className="w-full p-2 border rounded" value={formData.scriptDuration} onChange={e => updateForm('scriptDuration', e.target.value)}><option value="">Select...</option>{DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}</select>{formData.scriptDuration === 'Other' && <input type="text" value={formData.scriptDurationOther} onChange={(e) => updateForm('scriptDurationOther', e.target.value)} placeholder="e.g. 10 minutes..." className="w-full p-2 border border-purple-300 bg-purple-50 rounded mt-2"/>}</div>
+                    <div><label className="block font-medium mb-1">Style</label><select className="w-full p-2 border rounded" value={formData.scriptStyle} onChange={e => updateForm('scriptStyle', e.target.value)}><option value="">Select...</option>{STYLES.map(s => <option key={s} value={s}>{s}</option>)}</select>{formData.scriptStyle === 'Other' && <input type="text" value={formData.scriptStyleOther} onChange={(e) => updateForm('scriptStyleOther', e.target.value)} placeholder="e.g. Animation..." className="w-full p-2 border border-purple-300 bg-purple-50 rounded mt-2"/>}</div>
+                    <div><label className="block font-medium mb-1">Scenes</label><input type="number" min="3" value={formData.sceneCount} onChange={e => updateForm('sceneCount', e.target.value)} className="w-full p-2 border rounded"/></div>
+                </div>
+                <button onClick={generateScript} disabled={!formData.scriptDuration || loading} className="mt-8 bg-purple-600 text-white px-8 py-4 rounded-xl text-xl font-bold hover:bg-purple-700 shadow-xl">{loading ? "Generating..." : "Generate Script 🎬"}</button><button onClick={() => setStep(8)} className="block mx-auto mt-4 text-gray-400 text-sm">Back</button>
+            </div>
+        );
+
+        const StepScript = ({ script, scriptMeta, regenerateScene, setStep }) => (
+            <div className="p-8 animate-fade-in">
+                <h2 className="text-3xl font-bold text-purple-900 mb-2">Production Script</h2>
+                <p className="text-gray-500 mb-6">{scriptMeta?.title}</p>
+                <div className="space-y-6">{script.map((scene, idx) => (<div key={idx} className="border rounded-lg bg-white shadow-sm"><div className="bg-gray-50 px-4 py-2 border-b flex justify-between"><span className="font-bold text-gray-500">SCENE {idx + 1} ({scene.time_range})</span><button onClick={() => regenerateScene(idx)} className="text-xs text-blue-600">Regenerate 🔄</button></div><div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6"><div className="border-r pr-4"><h4 className="text-xs font-bold text-purple-600 mb-2">VISUALS</h4><p className="text-sm">{scene.visual}</p></div><div className="border-r pr-4"><h4 className="text-xs font-bold text-blue-600 mb-2">AUDIO</h4><p className="text-sm font-medium">"{scene.spoken}"</p></div><div><h4 className="text-xs font-bold text-gray-500 mb-2">NOTES</h4><p className="text-xs italic bg-yellow-50 p-2 rounded">{scene.notes}</p></div></div></div>))}</div>
+                <div className="mt-12 text-center p-8 bg-purple-50 rounded-xl"><button onClick={() => setStep(11)} className="bg-white text-purple-600 border border-purple-200 px-6 py-3 rounded-lg">Start New Session</button></div>
+            </div>
+        );
+
+        const ViralContentLab = () => {
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+            const [showWelcome, setShowWelcome] = useState(true);
+            const [showSaveNotification, setShowSaveNotification] = useState(false);
+            
+            const [formData, setFormData] = useState({
+                niche: '', nicheOther: '', audience: '', audienceOther: '', platform: '', platformOther: '', hookType: '', hookTypeOther: '', hookText: '', valuePattern: '', valuePatternOther: '', valueText: '', payoffFormula: '', payoffFormulaOther: '', payoffText: '', ctaType: '', ctaTypeOther: '', ctaText: '', scriptStyle: '', scriptStyleOther: '', scriptDuration: '', scriptDurationOther: '', sceneCount: 3, customInstructions: ''
+            });
+            const [analysis, setAnalysis] = useState(null);
+            const [script, setScript] = useState([]);
+            const [scriptMeta, setScriptMeta] = useState(null);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('viral_lab_draft');
+                if (saved) { try { const parsed = JSON.parse(saved); setFormData(parsed.formData || {}); setStep(parsed.step || 1); setAnalysis(parsed.analysis || null); setScript(parsed.script || []); } catch (e) { console.error("Load error", e); } }
+            }, []);
+            useEffect(() => { const timer = setInterval(() => handleSaveDraft(true), 30000); return () => clearInterval(timer); }, [formData, step, analysis, script]);
+            const handleSaveDraft = (auto = false) => { const state = { formData, step, analysis, script }; localStorage.setItem('viral_lab_draft', JSON.stringify(state)); if (!auto) { setShowSaveNotification(true); setTimeout(() => setShowSaveNotification(false), 3000); } };
+            const updateForm = (field, value) => { setFormData(prev => ({ ...prev, [field]: value })); };
+            const getFinalValue = (mainKey, otherKey) => { return formData[mainKey] === 'Other' || formData[mainKey] === 'Custom' ? formData[otherKey] : formData[mainKey]; };
+
+            const runAnalysis = async () => {
+                setLoading(true);
+                try {
+                    const systemPrompt = `You are a seasoned social media content marketing consultant. Your goal is to analyze the student's short-form video concept. Output JSON only. { "score": number, "overall_feedback": "string", "components": { "hook": { "score": 1-5, "feedback": "", "improved_version": "" }, "value": { "score": 1-5, "feedback": "", "improved_version": "" }, "payoff": { "score": 1-5, "feedback": "", "improved_version": "" }, "cta": { "score": 1-5, "feedback": "", "improved_version": "" } } }`;
+                    const userPrompt = `Niche: ${getFinalValue('niche', 'nicheOther')} Audience: ${getFinalValue('audience', 'audienceOther')} Platform: ${getFinalValue('platform', 'platformOther')} Hook Type: ${getFinalValue('hookType', 'hookTypeOther')} Hook Text: ${formData.hookText} Value Pattern: ${getFinalValue('valuePattern', 'valuePatternOther')} Value Text: ${formData.valueText} Payoff Formula: ${getFinalValue('payoffFormula', 'payoffFormulaOther')} Payoff Text: ${formData.payoffText} CTA Type: ${getFinalValue('ctaType', 'ctaTypeOther')} CTA Text: ${formData.ctaText} Custom Instruction: ${formData.customInstructions}`;
+                    
+                    const result = await callGeminiAPI(systemPrompt, userPrompt);
+                    setAnalysis(result);
+                    setStep(8);
+                } catch (error) { alert("Analysis Failed: " + error.message); } finally { setLoading(false); }
+            };
+
+            const generateScript = async () => {
+                setLoading(true);
+                try {
+                    const systemPrompt = `You are a Video Production AI. Generate a shooting script. Return strictly JSON: { "title": "string", "scenes": [ { "id": 1, "time_range": "0:00-0:03", "spoken": "string", "visual": "string", "notes": "string" } ] }`;
+                    const userPrompt = `Context: Score ${analysis?.score}/10 viral content. Platform: ${getFinalValue('platform', 'platformOther')} Style: ${getFinalValue('scriptStyle', 'scriptStyleOther')} Duration: ${getFinalValue('scriptDuration', 'scriptDurationOther')} Scene Count: ${formData.sceneCount} Hook: ${formData.hookText} Value: ${formData.valueText} Payoff: ${formData.payoffText} CTA: ${formData.ctaText}`;
+                    
+                    const result = await callGeminiAPI(systemPrompt, userPrompt);
+                    setScript(result.scenes);
+                    setScriptMeta({ title: result.title });
+                    setStep(10);
+                } catch (error) { alert("Script Gen Failed: " + error.message); } finally { setLoading(false); }
+            };
+
+            const regenerateScene = async (sceneIndex) => {
+                const sceneToEdit = script[sceneIndex];
+                if (!sceneToEdit) return;
+                const newScript = [...script];
+                newScript[sceneIndex] = { ...newScript[sceneIndex], notes: "Regenerating..." };
+                setScript(newScript);
+                try {
+                    const systemPrompt = `You are a surgical script editor. Return strictly JSON: { "time_range": "...", "spoken": "...", "visual": "...", "notes": "..." }`;
+                    const userPrompt = `Current Scene: ${JSON.stringify(sceneToEdit)}. Context: ${JSON.stringify(script.map(s => s.spoken))}. Instruction: Improve this scene to be punchier.`;
+                    const result = await callGeminiAPI(systemPrompt, userPrompt);
+                    setScript(prev => { const updated = [...prev]; updated[sceneIndex] = { ...result, id: sceneToEdit.id }; return updated; });
+                } catch (e) { alert("Regen failed: " + e.message); setScript(prev => { const reverted = [...prev]; reverted[sceneIndex] = { ...sceneToEdit }; return reverted; }); }
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+                    {showSaveNotification && <div className="fixed top-20 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow-lg z-50">✅ Draft Saved</div>}
+                    <Nav step={step} handleSaveDraft={handleSaveDraft} setShowWelcome={setShowWelcome} />
+                    <main className="max-w-4xl mx-auto p-4 md:p-8">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[60vh]">
+                            {step === 1 && <StepNiche formData={formData} updateForm={updateForm} setStep={setStep} />}
+                            {step === 2 && <StepAudience formData={formData} updateForm={updateForm} setStep={setStep} />}
+                            {step === 3 && <StepPlatform formData={formData} updateForm={updateForm} setStep={setStep} />}
+                            {step === 4 && <SelectionGridStep title="Step 4: Hook (0-3s)" description="The first 1-3 seconds that stop the scroll..." options={HOOK_OPTIONS} selected={formData.hookType} onSelect={(val) => updateForm('hookType', val)} otherValue={formData.hookTypeOther} onOtherChange={(val) => updateForm('hookTypeOther', val)} textValue={formData.hookText} onTextChange={(val) => updateForm('hookText', val)} placeholder="Write your hook..." tip="Stop the scroll!" prevStep={3} nextStep={5} minChars={10} setStep={setStep} />}
+                            {step === 5 && <SelectionGridStep title="Step 5: Value (3-25s)" description="The core content..." options={VALUE_OPTIONS} selected={formData.valuePattern} onSelect={(val) => updateForm('valuePattern', val)} otherValue={formData.valuePatternOther} onOtherChange={(val) => updateForm('valuePatternOther', val)} textValue={formData.valueText} onTextChange={(val) => updateForm('valueText', val)} placeholder="Deliver the value..." tip="Deliver ONE focused idea." prevStep={4} nextStep={6} minChars={20} setStep={setStep} />}
+                            {step === 6 && <SelectionGridStep title="Step 6: Payoff" description="The satisfying resolution..." options={PAYOFF_OPTIONS} selected={formData.payoffFormula} onSelect={(val) => updateForm('payoffFormula', val)} otherValue={formData.payoffFormulaOther} onOtherChange={(val) => updateForm('payoffFormulaOther', val)} textValue={formData.payoffText} onTextChange={(val) => updateForm('payoffText', val)} placeholder="Wrap it up..." tip="Make it quotable." prevStep={5} nextStep={7} minChars={10} setStep={setStep} />}
+                            {step === 7 && <StepCTA formData={formData} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
+                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} />}
+                            {step === 9 && <StepConfigGen formData={formData} updateForm={updateForm} setStep={setStep} generateScript={generateScript} loading={loading} />}
+                            {step === 10 && <StepScript script={script} scriptMeta={scriptMeta} regenerateScene={regenerateScene} setStep={setStep} />}
+                            {step === 11 && (<div className="p-12 text-center"><h2 className="text-2xl font-bold mb-4">Start Over?</h2><button onClick={() => { localStorage.removeItem('viral_lab_draft'); window.location.reload(); }} className="px-6 py-2 bg-red-600 text-white rounded">Yes, Delete & Restart</button><button onClick={() => setStep(10)} className="ml-4 px-6 py-2 bg-gray-100 rounded">Cancel</button></div>)}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ViralContentLab />);
+    </script>
+</body>
+</html>
