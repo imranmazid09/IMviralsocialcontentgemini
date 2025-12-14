@@ -210,15 +210,15 @@
             </div>
         );
 
-        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis }) => {
+        const StepAnalysis = ({ analysis, updateForm, setStep, runAnalysis, loading }) => {
             if (!analysis) return <div>Error: No Analysis Data.</div>;
             const passed = analysis.score >= 8;
             const Card = ({ title, comp }) => (
                 <div className="bg-white border rounded-lg shadow-sm mb-4">
                     <div className="bg-gray-50 px-4 py-2 border-b flex justify-between font-bold text-sm text-gray-600"><span>{title.toUpperCase()}</span><span className={comp.score < 4 ? 'text-red-500' : 'text-green-600'}>{comp.score}/5</span></div>
-                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm">Original text hidden for space...</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm">{comp.improved_version}</p></div></div>
+                    <div className="grid grid-cols-2 divide-x"><div className="p-4 bg-red-50/30"><p className="text-xs font-bold text-red-700 mb-1">ORIGINAL</p><p className="text-sm">{comp.original_snippet || "See above"}</p></div><div className="p-4 bg-green-50/30"><p className="text-xs font-bold text-green-700 mb-1">AI IMPROVED</p><p className="text-sm">{comp.improved_version}</p></div></div>
                     <div className="p-3 bg-gray-50 text-xs italic border-t">{comp.feedback}</div>
-                    <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded">Accept ✅</button></div>
+                    <div className="p-2 border-t text-right"><button onClick={() => updateForm(title.toLowerCase() + 'Text', comp.improved_version)} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Accept Improved Version ✅</button></div>
                 </div>
             );
             return (
@@ -228,7 +228,21 @@
                     <Card title="Value" comp={analysis.components.value} />
                     <Card title="Payoff" comp={analysis.components.payoff} />
                     <Card title="CTA" comp={analysis.components.cta} />
-                    <div className="mt-8 flex justify-center gap-4">{!passed && <button onClick={runAnalysis} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold">Re-Analyze 🔄</button>}<button onClick={() => setStep(9)} disabled={!passed} className="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">{passed ? "Generate Script 🎬" : "Refine to Proceed"}</button></div>
+                    <div className="mt-8 flex flex-col md:flex-row justify-center gap-4 items-center">
+                        <button onClick={runAnalysis} disabled={loading} className="border-2 border-purple-600 text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-purple-50 disabled:opacity-50">
+                            {loading ? "Analyzing... ⏳" : "Re-Analyze (Current Text) 🔄"}
+                        </button>
+                        
+                        {!passed && (
+                            <button onClick={() => setStep(4)} className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-300">
+                                ✏️ Go Back & Edit Manually
+                            </button>
+                        )}
+
+                        <button onClick={() => setStep(9)} disabled={!passed} className="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                            {passed ? "Generate Script 🎬" : "⚠️ Score 8+ Needed to Proceed"}
+                        </button>
+                    </div>
                 </div>
             );
         };
@@ -279,19 +293,58 @@
             const runAnalysis = async () => {
                 setLoading(true);
                 try {
-                    const systemPrompt = `You are a seasoned social media content marketing consultant. Your goal is to analyze the student's short-form video concept. Output JSON only. { "score": number, "overall_feedback": "string", "components": { "hook": { "score": 1-5, "feedback": "", "improved_version": "" }, "value": { "score": 1-5, "feedback": "", "improved_version": "" }, "payoff": { "score": 1-5, "feedback": "", "improved_version": "" }, "cta": { "score": 1-5, "feedback": "", "improved_version": "" } } }`;
-                    const userPrompt = `Niche: ${getFinalValue('niche', 'nicheOther')} Audience: ${getFinalValue('audience', 'audienceOther')} Platform: ${getFinalValue('platform', 'platformOther')} Hook Type: ${getFinalValue('hookType', 'hookTypeOther')} Hook Text: ${formData.hookText} Value Pattern: ${getFinalValue('valuePattern', 'valuePatternOther')} Value Text: ${formData.valueText} Payoff Formula: ${getFinalValue('payoffFormula', 'payoffFormulaOther')} Payoff Text: ${formData.payoffText} CTA Type: ${getFinalValue('ctaType', 'ctaTypeOther')} CTA Text: ${formData.ctaText} Custom Instruction: ${formData.customInstructions}`;
+                    // --- UPDATED STRICT SYSTEM PROMPT ---
+                    const systemPrompt = `You are a strict, world-class Viral Content Strategist & Critic. Your job is to grade short-form video scripts with ZERO TOLERANCE for laziness, hallucination, or mismatch.
+
+CRITICAL RULES:
+1. GIBBERISH/LAZINESS DETECTOR: If the user input contains random letters (e.g., "asdf", "fffff"), placeholders, or is fewer than 10 words total, you MUST return a Total Score of 0/10 and Component Scores of 0/5. The "overall_feedback" MUST be exactly: "The input appears to be invalid or too short. Please write actual content to receive a grade."
+2. ANTI-HALLUCINATION: Grade ONLY the text provided. Do not imagine what the user "meant" to say. If it's not written, it doesn't exist.
+3. REALITY CHECK: Check if the text matches the selected Strategy. Example: If "Curiosity Gap" is selected but the text is "Hello everyone", give a score of 1/5 for the Hook and scold the user in feedback.
+4. SCORING: 
+   - < 8/10: Fail. Harsh, constructive feedback.
+   - 8+/10: Pass. 
+   - 10/10: Only for Super Bowl commercial level perfection.
+   
+OUTPUT FORMAT: Strictly JSON only. No markdown.
+{ 
+  "score": number (0-10), 
+  "overall_feedback": "string", 
+  "components": { 
+    "hook": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
+    "value": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
+    "payoff": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" }, 
+    "cta": { "score": 1-5, "feedback": "Critique", "improved_version": "Better version", "original_snippet": "Snippet of user text" } 
+  } 
+}`;
+
+                    const userPrompt = `
+STRATEGY CONTEXT:
+- Niche: ${getFinalValue('niche', 'nicheOther')} 
+- Audience: ${getFinalValue('audience', 'audienceOther')} 
+- Platform: ${getFinalValue('platform', 'platformOther')}
+
+CONTENT TO GRADE:
+1. HOOK (Strategy: ${getFinalValue('hookType', 'hookTypeOther')}): "${formData.hookText}"
+2. VALUE (Strategy: ${getFinalValue('valuePattern', 'valuePatternOther')}): "${formData.valueText}"
+3. PAYOFF (Strategy: ${getFinalValue('payoffFormula', 'payoffFormulaOther')}): "${formData.payoffText}"
+4. CTA (Strategy: ${getFinalValue('ctaType', 'ctaTypeOther')}): "${formData.ctaText}"
+
+USER NOTES: ${formData.customInstructions}`;
                     
                     const result = await callGeminiAPI(systemPrompt, userPrompt);
                     setAnalysis(result);
                     setStep(8);
-                } catch (error) { alert("Analysis Failed: " + error.message); } finally { setLoading(false); }
+                } catch (error) { 
+                    alert("Analysis Failed: " + error.message); 
+                } finally { 
+                    setLoading(false); 
+                }
             };
 
             const generateScript = async () => {
                 setLoading(true);
                 try {
-                    const systemPrompt = `You are a Video Production AI. Generate a shooting script. Return strictly JSON: { "title": "string", "scenes": [ { "id": 1, "time_range": "0:00-0:03", "spoken": "string", "visual": "string", "notes": "string" } ] }`;
+                    const systemPrompt = `You are a Video Production AI. Generate a detailed shooting script based on the approved content. Return strictly JSON: { "title": "string", "scenes": [ { "id": 1, "time_range": "0:00-0:03", "spoken": "string", "visual": "string", "notes": "string" } ] }`;
                     const userPrompt = `Context: Score ${analysis?.score}/10 viral content. Platform: ${getFinalValue('platform', 'platformOther')} Style: ${getFinalValue('scriptStyle', 'scriptStyleOther')} Duration: ${getFinalValue('scriptDuration', 'scriptDurationOther')} Scene Count: ${formData.sceneCount} Hook: ${formData.hookText} Value: ${formData.valueText} Payoff: ${formData.payoffText} CTA: ${formData.ctaText}`;
                     
                     const result = await callGeminiAPI(systemPrompt, userPrompt);
@@ -329,7 +382,7 @@
                             {step === 5 && <SelectionGridStep title="Step 5: Value (3-25s)" description="The core content..." options={VALUE_OPTIONS} selected={formData.valuePattern} onSelect={(val) => updateForm('valuePattern', val)} otherValue={formData.valuePatternOther} onOtherChange={(val) => updateForm('valuePatternOther', val)} textValue={formData.valueText} onTextChange={(val) => updateForm('valueText', val)} placeholder="Deliver the value..." tip="Deliver ONE focused idea." prevStep={4} nextStep={6} minChars={20} setStep={setStep} />}
                             {step === 6 && <SelectionGridStep title="Step 6: Payoff" description="The satisfying resolution..." options={PAYOFF_OPTIONS} selected={formData.payoffFormula} onSelect={(val) => updateForm('payoffFormula', val)} otherValue={formData.payoffFormulaOther} onOtherChange={(val) => updateForm('payoffFormulaOther', val)} textValue={formData.payoffText} onTextChange={(val) => updateForm('payoffText', val)} placeholder="Wrap it up..." tip="Make it quotable." prevStep={5} nextStep={7} minChars={10} setStep={setStep} />}
                             {step === 7 && <StepCTA formData={formData} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
-                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} />}
+                            {step === 8 && <StepAnalysis analysis={analysis} updateForm={updateForm} setStep={setStep} runAnalysis={runAnalysis} loading={loading} />}
                             {step === 9 && <StepConfigGen formData={formData} updateForm={updateForm} setStep={setStep} generateScript={generateScript} loading={loading} />}
                             {step === 10 && <StepScript script={script} scriptMeta={scriptMeta} regenerateScene={regenerateScene} setStep={setStep} />}
                             {step === 11 && (<div className="p-12 text-center"><h2 className="text-2xl font-bold mb-4">Start Over?</h2><button onClick={() => { localStorage.removeItem('viral_lab_draft'); window.location.reload(); }} className="px-6 py-2 bg-red-600 text-white rounded">Yes, Delete & Restart</button><button onClick={() => setStep(10)} className="ml-4 px-6 py-2 bg-gray-100 rounded">Cancel</button></div>)}
